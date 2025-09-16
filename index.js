@@ -24,6 +24,10 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 
+app.get("/", (req,res) => {
+  res.send("Hello from Server Side")
+})
+
 app.listen(PORT, () => {
   console.log(`Server is running at PORT ${PORT}`);
 });
