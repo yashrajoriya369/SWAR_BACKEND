@@ -5,13 +5,19 @@ const PORT = process.env.PORT || 4000;
 const dbConnect = require("./config/dbConnect");
 const app = express();
 const authRouter = require("./routes/authRoute");
-const cookieParser = require("cookie-paser");
+const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const morgan = require("morgan");
 
 dbConnect();
 app.use(morgan("dev"));
 app.use(cors());
+// {
+//   origin: "http://localhost:3000",
+//   credentials: true,
+//   methods: ["GET", "POST", "PUT", "DELETE"],
+// })
+// );
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
