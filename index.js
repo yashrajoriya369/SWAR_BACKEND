@@ -11,22 +11,22 @@ const morgan = require("morgan");
 
 dbConnect();
 app.use(morgan("dev"));
-app.use(cors());
-// {
-//   origin: "http://localhost:3000",
-//   credentials: true,
-//   methods: ["GET", "POST", "PUT", "DELETE"],
-// })
-// );
+app.use(
+  cors({
+    origin: "https://user-omega-three.vercel.app/",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 
-app.get("/", (req,res) => {
-  res.send("Hello from Server Side")
-})
+app.get("/", (req, res) => {
+  res.send("Hello from Server Side");
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running at PORT ${PORT}`);
