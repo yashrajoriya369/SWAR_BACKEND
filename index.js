@@ -5,6 +5,7 @@ const PORT = process.env.PORT || 4000;
 const dbConnect = require("./config/dbConnect");
 const app = express();
 const authRouter = require("./routes/authRoute");
+const postRouter = require("./routes/quizRoute")
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -24,6 +25,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
+app.use("/api/quiz", postRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello from Server Side");
