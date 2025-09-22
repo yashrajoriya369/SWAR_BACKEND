@@ -12,20 +12,13 @@ const morgan = require("morgan");
 
 dbConnect();
 app.use(morgan("dev"));
-// app.use(
-//   cors({
-//     origin: "https://user-omega-three.vercel.app/",
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//   })
-// );
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
-app.use("/api/quiz", postRouter);
+app.use("/api/quizzes", postRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello from Server Side");
