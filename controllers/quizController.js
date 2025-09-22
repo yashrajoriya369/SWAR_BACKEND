@@ -10,6 +10,16 @@ const createQuiz = async (req, res) => {
   }
 };
 
+const getAllQuizzes = async (req, res) => {
+  try {
+    const quizzes = await Quiz.find().sort({ createdAt: -1 });
+    res.status(200).json(quizzes);
+  } catch (error) {
+    console.error("Error fetching quizzes:", error);
+    res.status(500).json({ error: "Server Error" });
+  }
+};
+
 const getQuizById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -35,4 +45,5 @@ const getQuizById = async (req, res) => {
 module.exports = {
   createQuiz,
   getQuizById,
+  getAllQuizzes,
 };
