@@ -225,6 +225,7 @@ const updateQuiz = async (req, res) => {
     res.status(200).json({ message: "Quiz updated successfully", updatedQuiz });
   } catch (error) {
     console.error("Error updating quiz:", error);
+    
     res.status(500).json({ error: "Server error" });
   }
 };

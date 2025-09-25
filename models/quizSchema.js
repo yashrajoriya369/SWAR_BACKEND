@@ -17,34 +17,32 @@ var questionSchema = new mongoose.Schema(
       default: 1,
       min: 0,
     },
-    options: [
-      {
-        type: String,
-        required: function () {
-          return this.questionType === "Multiple Choice";
+    options: {
+      type: [String],
+      validate: {
+        validator: function (v) {
+          // Make sure the question is Multiple Choice and has at least 2 non-empty options
+          return (
+            this.questionType !== "Multiple Choice" ||
+            (Array.isArray(v) &&
+              v.filter((opt) => opt.trim() !== "").length >= 2)
+          );
         },
-        validate: {
-          validator: function (arr) {
-            return this.questionType === "Multiple Choice"
-              ? arr.length >= 2
-              : true;
-          },
-          message: "Multiple choice question must have at least 2 options.",
-        },
+        message:
+          "Multiple choice question must have at least 2 non-empty options.",
       },
-    ],
+      required: true,
+    },
     correctAnswer: {
       type: String,
       required: true,
       validate: {
         validator: function (value) {
-      if (this.questionType === "Multiple Choice") {
-        console.log("Options:", this.options);
-        console.log("Correct Answer:", value);
-        return Array.isArray(this.options) && this.options.includes(value);
-      }
-      return true;
-    },
+          if (this.questionType === "Multiple Choice") {
+            return Array.isArray(this.options) && this.options.includes(value);
+          }
+          return true;
+        },
         message: "Correct answer must be one of the questions.",
       },
     },
@@ -74,14 +72,14 @@ var quizSchema = new mongoose.Schema(
     endTime: {
       type: Date,
       required: true,
-      validate: {
-        validator: function (value) {
-          return value > this.startTime;
-        },
-        message: "End time must be after start time.",
-      },
+      // validate: {
+      //   validator: function (value) {
+      //     return value > this.startTime;
+      //   },
+      //   message: "End time must be after start time.",
+      // },
     },
-    durationMintutes: { type: Number, require: true, min: 1 },
+    durationMinutes: { type: Number, require: true, min: 1 },
     status: {
       type: String,
       enum: ["Active", "Inactive", "Completed"],
