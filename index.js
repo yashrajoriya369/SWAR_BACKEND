@@ -9,16 +9,20 @@ const postRouter = require("./routes/quizRoute");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const morgan = require("morgan");
+const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 dbConnect();
 app.use(morgan("dev"));
-app.use(cors());
+app.use(cors({ origin: "http://localhost:3000" }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/quizzes", postRouter);
+
+app.use(notFound);
+app.use(errorHandler);
 
 app.get("/", (req, res) => {
   res.send("Hello from Server Side");
@@ -27,4 +31,3 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running at PORT ${PORT}`);
 });
-

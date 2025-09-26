@@ -11,7 +11,7 @@ const errorHandler = (err, req, res, next) => {
   res.json({
     status: "fail",
     message: err?.message,
-    statck: err?.statck,
+    statck: process.env.NODE_ENV === "production" ? undefined : err?.statck,
   });
 };
 

@@ -1,6 +1,5 @@
 const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
-// const { generateRefreshToken } = require("../config/refreshToken");
 const { generateToken } = require("../config/jwtoken");
 const { validateSignup } = require("../validator/authValidator");
 

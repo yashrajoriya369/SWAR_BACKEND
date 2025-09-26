@@ -82,8 +82,8 @@ var quizSchema = new mongoose.Schema(
     durationMinutes: { type: Number, require: true, min: 1 },
     status: {
       type: String,
-      enum: ["Active", "Inactive", "Completed"],
-      default: "Inactive",
+      enum: ["Active", "Draft", "Archived"],
+      default: "Draft",
     },
     questions: {
       type: [questionSchema],
@@ -99,5 +99,16 @@ var quizSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+quizSchema.virtual("runtimeStatus").
+  get(function () {
+    const now = new Date();
+    if (now < this.startTime) return "Upcoming";
+    if (now >= this.startTime && now <= this.endTime) return "Running";
+    return "Ended";
+  });
+
+quizSchema.set("toJSON", { virtuals: true });
+quizSchema.set("toObject", { virtuals: true });
 
 module.exports = mongoose.model("Quiz", quizSchema);
