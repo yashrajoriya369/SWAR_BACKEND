@@ -18,6 +18,8 @@ app.use(morgan("dev"));
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "https://user-omega-three.vercel.app",
+  "https://swar-admin-ko63.vercel.app",
 ];
 
 app.use(
