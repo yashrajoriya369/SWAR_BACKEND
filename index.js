@@ -9,7 +9,6 @@ const postRouter = require("./routes/quizRoute");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const morgan = require("morgan");
-const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 dbConnect();
 app.use(morgan("dev"));
@@ -41,9 +40,6 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/quizzes", postRouter);
-
-app.use(notFound);
-app.use(errorHandler);
 
 app.get("/", (req, res) => {
   res.send("Hello from Server Side");

@@ -27,13 +27,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const user = await User.create({ fullName, email, password });
   const token = generateToken(user._id);
-  res.cookie("token", token),
-    {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 3600000,
-    };
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 3600000,
+  });
   res.status(201).json({
     message: "User registered successfully",
     user: {
@@ -49,7 +48,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    res.status(400).json({ error: "Email and password are required" });
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   const user = await User.findOne({ email }).select("+password");
