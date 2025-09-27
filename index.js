@@ -13,8 +13,28 @@ const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 dbConnect();
 app.use(morgan("dev"));
+// app.use(cors());
+
+// Allow multiple specific origins
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://user-omega-three.vercel.app",
+];
+
 app.use(
-  cors({ origin: "http://localhost:3000" || "https://your-backend.vercel.app" })
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // if you need cookies / auth headers
+  })
 );
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
