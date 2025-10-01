@@ -54,3 +54,8 @@ serviceAccountKey.json
 # Others
 *.tgz
 *.zip
+
+# Firebase / Google service account keys
+config/serviceAccountKey.json
+*.json
+
