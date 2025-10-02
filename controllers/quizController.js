@@ -1,102 +1,10 @@
-// const Quiz = require("../models/quizSchema");
-
-// // Create a New Quiz
-// const createQuiz = async (req, res) => {
-//   try {
-//     const quiz = await Quiz.create(req.body);
-//     res.status(201).json(quiz);
-//   } catch (error) {
-//     res.status(400).json({ error: error.message });
-//   }
-// };
-
-// // Get all Quizzes
-// const getAllQuizzes = async (req, res) => {
-//   try {
-//     const quizzes = await Quiz.find();
-//     res.status(200).json(quizzes);
-//   } catch (error) {
-//     console.error("Error fetching quizzes:", error);
-//     res.status(500).json({ error: "Server Error" });
-//   }
-// };
-
-// // Get a Single Quiz
-// const getQuizById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Validate ObjectId
-//     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-//       return res.status(400).json({ error: "Invalid quiz ID format" });
-//     }
-
-//     const quiz = await Quiz.findById(id);
-
-//     if (!quiz) {
-//       return res.status(404).json({ error: "Quiz not found" });
-//     }
-
-//     return res.status(200).json(quiz);
-//   } catch (err) {
-//     console.error("Error fetching quiz:", err);
-//     return res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-// // Delete a Quiz
-// const deleteQuiz = async (req, res) => {
-//   const { id } = req.params;
-
-//   // Validate ID format
-//   if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-//     return res.status(400).json({ error: "Invalid quiz ID format" });
-//   }
-
-//   try {
-//     const deletedQuiz = await Quiz.findByIdAndDelete(id);
-
-//     if (!deletedQuiz) {
-//       return res.status(404).json({ error: "Quiz not found" });
-//     }
-
-//     res.status(200).json({ message: "Quiz deleted successfully" });
-//   } catch (error) {
-//     console.error("Error deleting quiz:", error);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-// // Update a Quiz
-// const updateQuiz = async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     const updateQuiz = await Quiz.findByIdAndUpdate(id, req.body, {
-//       new: true,
-//     });
-//     res.json(updateQuiz);
-//   } catch (error) {
-//     throw new Error(error);
-//   }
-// };
-
-// module.exports = {
-//   createQuiz,
-//   getQuizById,
-//   getAllQuizzes,
-//   deleteQuiz,
-//   updateQuiz,
-// };
-
 const mongoose = require("mongoose");
 const Quiz = require("../models/quizSchema");
-
-// Helper: Validate MongoDB ObjectId
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const { getQuizRuntimeStatus } = require("../utils/quiz");
+const Attempt = require("../models/quizAttemptModel");
 
-// ============================
 // Create a New Quiz
-// ============================
 const createQuiz = async (req, res) => {
   try {
     const {
@@ -110,7 +18,6 @@ const createQuiz = async (req, res) => {
       questions,
     } = req.body;
 
-    // Basic validation
     if (
       !subjectId ||
       !quizName ||
@@ -122,7 +29,9 @@ const createQuiz = async (req, res) => {
       !Array.isArray(questions) ||
       questions.length === 0
     ) {
-      return res.status(400).json({ error: "Missing or invalid required fields" });
+      return res
+        .status(400)
+        .json({ error: "Missing or invalid required fields" });
     }
 
     const quiz = await Quiz.create({
@@ -143,9 +52,7 @@ const createQuiz = async (req, res) => {
   }
 };
 
-// ============================
 // Get All Quizzes
-// ============================
 const getAllQuizzes = async (req, res) => {
   try {
     const quizzes = await Quiz.find().sort({ createdAt: -1 });
@@ -156,9 +63,7 @@ const getAllQuizzes = async (req, res) => {
   }
 };
 
-// ============================
 // Get a Single Quiz by ID
-// ============================
 const getQuizById = async (req, res) => {
   const { id } = req.params;
 
@@ -180,9 +85,7 @@ const getQuizById = async (req, res) => {
   }
 };
 
-// ============================
 // Update a Quiz
-// ============================
 const updateQuiz = async (req, res) => {
   const { id } = req.params;
 
@@ -209,7 +112,9 @@ const updateQuiz = async (req, res) => {
   }
 
   if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: "No valid fields provided for update" });
+    return res
+      .status(400)
+      .json({ error: "No valid fields provided for update" });
   }
 
   try {
@@ -225,14 +130,12 @@ const updateQuiz = async (req, res) => {
     res.status(200).json({ message: "Quiz updated successfully", updatedQuiz });
   } catch (error) {
     console.error("Error updating quiz:", error);
-    
+
     res.status(500).json({ error: "Server error" });
   }
 };
 
-// ============================
 // Delete a Quiz
-// ============================
 const deleteQuiz = async (req, res) => {
   const { id } = req.params;
 
@@ -254,11 +157,90 @@ const deleteQuiz = async (req, res) => {
   }
 };
 
+const getQuizzesWithUserAttempts = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    // pagination
+    const page = Math.max(1, parseInt(req.query.page || "1", 10));
+    const limit = Math.max(
+      1,
+      Math.min(100, parseInt(req.query.limit || "20", 10))
+    );
+    const skip = (page - 1) * limit;
+
+    // fetch quiz list (lean for performance)
+    const quizzes = await Quiz.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (!quizzes || quizzes.length === 0) {
+      return res.status(200).json({ quizzes: [], page, limit });
+    }
+
+    // collect quizIds from quizzes (they are already ObjectId or strings)
+    const quizIds = quizzes.map((q) => q._id);
+
+    // aggregate latest attempt per quiz for this user
+    const attemptsAgg = await Attempt.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId), // use `new` here
+          quizId: { $in: quizIds },
+        },
+      },
+      { $sort: { createdAt: -1 } }, // newest first
+      {
+        $group: {
+          _id: "$quizId",
+          attempt: { $first: "$$ROOT" },
+        },
+      },
+    ]);
+
+    // map quizId -> attempt
+    const attemptMap = new Map();
+    for (const item of attemptsAgg) {
+      attemptMap.set(item._id.toString(), item.attempt);
+    }
+
+    // attach userAttempt + runtimeStatus
+    const result = quizzes.map((quiz) => {
+      const a = attemptMap.get(quiz._id.toString()) || null;
+      const userAttempt = a
+        ? {
+            attemptId: a._id,
+            score: a.score,
+            completed: !!a.completed,
+            startedAt: a.startedAt,
+            finishedAt: a.finishedAt,
+          }
+        : null;
+
+      const runtimeStatus = getQuizRuntimeStatus(quiz, !!userAttempt);
+
+      return {
+        ...quiz,
+        runtimeStatus,
+        userAttempt,
+      };
+    });
+
+    return res.status(200).json({ quizzes: result, page, limit });
+  } catch (error) {
+    console.error("Error in getQuizzesWithUserAttempts:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   createQuiz,
   getAllQuizzes,
   getQuizById,
   updateQuiz,
   deleteQuiz,
+  getQuizzesWithUserAttempts,
 };
-
