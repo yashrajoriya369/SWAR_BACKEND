@@ -55,8 +55,17 @@ const createQuiz = async (req, res) => {
 // Get All Quizzes
 const getAllQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find().sort({ createdAt: -1 });
-    res.status(200).json(quizzes);
+    const quizzes = await Quiz.find()
+      .sort({ createdAt: -1 })
+      .lean({ virtuals: true });
+
+    const enriched = quizzes.map((q) => {
+      return {
+        ...q,
+        runtimeStatus: getQuizRuntimeStatus(q, false),
+      };
+    });
+    res.status(200).json(enriched);
   } catch (error) {
     console.error("Error fetching quizzes:", error);
     res.status(500).json({ error: "Server error" });

@@ -1,6 +1,6 @@
 const isProduction = process.env.NODE_ENV === "production";
 
-function setTokenCookie(res, token, { maxAge = 1000 * 60 * 60 } = {}) {
+function setTokenCookie(res, token, { maxAge = 1000 * 60 * 60 * 3 } = {}) {
   res.cookie("token", token, {
     httpOnly: true,
     secure: isProduction,
