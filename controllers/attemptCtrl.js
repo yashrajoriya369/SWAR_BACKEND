@@ -1,4 +1,3 @@
-// controllers/attemptController.js
 const mongoose = require("mongoose");
 const Attempt = require("../models/quizAttemptModel");
 const Quiz = require("../models/quizSchema");
