@@ -2,6 +2,7 @@
 const mongoose = require("mongoose");
 const Attempt = require("../models/quizAttemptModel");
 const Quiz = require("../models/quizSchema");
+const asyncHandler = require("express-async-handler");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
