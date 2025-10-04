@@ -69,6 +69,7 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   const token = generateToken(user._id);
+  res.setHeader("Cache-Control", "no-store");
   setTokenCookie(res, token);
 
   res.status(200).json({
