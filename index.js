@@ -26,7 +26,9 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
+      // Allow same-origin requests (no Origin header)
       if (!origin) return callback(null, true);
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
@@ -34,6 +36,7 @@ app.use(
       }
     },
     credentials: true,
+    exposedHeaders: ["set-cookie"]
   })
 );
 app.use(bodyParser.json());
