@@ -69,10 +69,6 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   const token = generateToken(user._id);
-  // ✅ Prevent caching (fix for Cache-Control issue)
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
   setTokenCookie(res, token);
 
   res.status(200).json({
