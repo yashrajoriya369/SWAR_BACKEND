@@ -70,11 +70,9 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const token = generateToken(user._id);
   setTokenCookie(res, token);
-  console.log("Login headers:", res.getHeaders());
 
   res.status(200).json({
     message: "Login Successfully",
-    token,
     user: {
       id: user._id,
       fullName: user.fullName,
