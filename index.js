@@ -36,7 +36,19 @@ app.use(
       }
     },
     credentials: true,
-    exposedHeaders: ["set-cookie"]
+    exposedHeaders: ["set-cookie"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+app.options(
+  "*",
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(bodyParser.json());
