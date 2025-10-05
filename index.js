@@ -16,28 +16,56 @@ const morgan = require("morgan");
 dbConnect();
 app.use(morgan("dev"));
 
+// const allowedOrigins = [
+//   "http://localhost:3000",
+//   "http://localhost:3001",
+//   "https://user-gold-omega.vercel.app",
+//   "https://swar-admin-ko63.vercel.app",
+// ];
+
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       if (!origin) return callback(null, true);
+
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       } else {
+//         return callback(new Error("Not allowed by CORS"));
+//       }
+//     },
+//     credentials: true,
+//   })
+// );
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "https://user-gold-omega.vercel.app",
   "https://swar-admin-ko63.vercel.app",
-  "https://user-gold-omega.vercel.app/"
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
+        console.log("❌ Blocked CORS for origin:", origin);
         return callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
   })
 );
+
+// ✅ Ensure Express responds to OPTIONS (important on Vercel)
+app.options("*", cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
