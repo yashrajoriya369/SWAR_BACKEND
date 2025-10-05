@@ -21,12 +21,12 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://user-gold-omega.vercel.app",
   "https://swar-admin-ko63.vercel.app",
+  "https://user-gold-omega.vercel.app/"
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow same-origin requests (no Origin header)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
