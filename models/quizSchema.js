@@ -36,7 +36,8 @@ const questionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const quizSchema = new mongoose.Schema({
-  subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true, index: true },
+  // subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true, index: true },
+  subjectId: { type: String, required: true, index: true },
   quizName: { type: String, required: true, trim: true, index: true },
   attemptType: { type: String, enum: ["Single", "Multiple"], required: true },
   startTime: { type: Date, required: true, index: true },
