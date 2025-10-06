@@ -48,6 +48,13 @@ const createQuiz = async (req, res) => {
     res.status(201).json({ message: "Quiz created successfully", quiz });
   } catch (error) {
     console.error("Error creating quiz:", error);
+    if (error.name === "ValidationError") {
+      const details = Object.keys(error.errors).reduce((acc, key) => {
+        acc[key] = error.errors[key].message;
+        return acc;
+      }, {});
+      return res.status(400).json({ error: "Validation failed", details });
+    }
     res.status(500).json({ error: error.message || "Server error" });
   }
 };
