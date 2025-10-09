@@ -6,7 +6,6 @@ const crypto = require("crypto");
 const sendEmail = require("./emailController");
 const { registerSchema } = require("../utils/validationSchema");
 const EmailOTP = require("../models/emailModel");
-const admin = require("../firebase/firebaseAdmin");
 
 const registerUser = asyncHandler(async (req, res) => {
   const { error } = registerSchema.validate(req.body);
@@ -34,6 +33,7 @@ const registerUser = asyncHandler(async (req, res) => {
     fullName,
     email,
     password,
+    roles: "student",
     isVerified: true,
   });
 
@@ -68,7 +68,7 @@ const loginUser = asyncHandler(async (req, res) => {
       .json({ error: "Please verify your email using OTP before logging in." });
   }
 
-  const token = generateToken(user._id);
+  const token = generateToken(user);
   setTokenCookie(res, token);
 
   res.status(200).json({
@@ -77,49 +77,9 @@ const loginUser = asyncHandler(async (req, res) => {
       id: user._id,
       fullName: user.fullName,
       email: user.email,
+      roles: user.roles,
     },
   });
-});
-
-const socialLogin = asyncHandler(async (req, res) => {
-  try {
-    const idToken =
-      req.headers.authorization?.split(" ")[1] || req.body.idToken;
-    if (!idToken) return res.status(400).json({ error: "Token required" });
-
-    // Verify Firebase ID token
-    const decoded = await admin.auth().verifyIdToken(idToken);
-
-    let user = await User.findOne({ email: decoded.email });
-
-    if (!user) {
-      // Create user with random password
-      user = await User.create({
-        fullName: decoded.name,
-        email: decoded.email,
-        password: crypto.randomBytes(16).toString("hex"),
-        isVerified: true,
-        avatar: decoded.picture,
-        authProvider: decoded.firebase.sign_in_provider,
-      });
-    }
-
-    const jwt = generateToken(user._id);
-    setTokenCookie(res, jwt);
-
-    res.status(200).json({
-      message: "Login successful",
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        provider: user.authProvider,
-      },
-    });
-  } catch (err) {
-    console.error("Social Login Error:", err);
-    res.status(401).json({ error: "Invalid or expired token" });
-  }
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
@@ -130,6 +90,5 @@ const logoutUser = asyncHandler(async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
-  socialLogin,
   logoutUser,
 };

@@ -63,9 +63,18 @@ const questionSchema = new mongoose.Schema(
 const quizSchema = new mongoose.Schema(
   {
     // subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true, index: true },
-    subjectId: { type: String, required: true, index: true },
+    subjectId: { type: String, required: true, index: true }, // if you have Subject collection, switch to ObjectId ref
     quizName: { type: String, required: true, trim: true, index: true },
-    attemptType: { type: String, enum: ["Single", "Multiple"], required: true },
+    attemptType: {
+      type: String,
+      enum: ["Single", "Multiple"],
+      required: true,
+      default: "Single",
+    },
+    maxAttemptsPerUser: {
+      type: Number,
+      min: 1,
+    },
     startTime: { type: Date, required: true, index: true },
     endTime: { type: Date, required: true },
     durationMinutes: { type: Number, required: true, min: 1 },
@@ -75,15 +84,40 @@ const quizSchema = new mongoose.Schema(
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
         message: "Quiz must have at least one question.",
       },
+      required: true,
     },
-    // optional summary fields:
     attemptCount: { type: Number, default: 0 },
     completedCount: { type: Number, default: 0 },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    facultyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    shuffleQuestions: { type: Boolean, default: false },
+    shuffleOptions: { type: Boolean, default: false },
+    visibility: {
+      type: String,
+      enum: ["public", "private", "group"],
+      default: "private",
+    },
+    targetGroups: [{ type: String }],
+    notes: { type: String },
   },
   { timestamps: true }
 );
-
 quizSchema.pre("validate", function (next) {
+  if (!this.facultyId && this.createdBy) {
+    this.facultyId = this.createdBy;
+  }
+
   if (
     this.endTime &&
     this.startTime &&
@@ -91,6 +125,14 @@ quizSchema.pre("validate", function (next) {
   ) {
     return next(new Error("endTime must be after startTime"));
   }
+  if (this.attemptType === "Single") {
+    this.maxAttemptsPerUser = 1;
+  } else {
+    if (this.maxAttemptsPerUser === 0) {
+      this.maxAttemptsPerUser = undefined;
+    }
+  }
+
   next();
 });
 
@@ -100,5 +142,19 @@ quizSchema.virtual("runtimeStatus").get(function () {
   if (now >= this.startTime && now <= this.endTime) return "Running";
   return "Ended";
 });
+
+quizSchema.methods.isOpen = function () {
+  const now = new Date();
+  return now >= this.startTime && now <= this.endTime;
+};
+
+quizSchema.methods.isAssignedTo = function (userId) {
+  if (!this.assignedTo || this.assignedTo.length === 0) return true;
+  return this.assignedTo.some((id) => id.toString() === userId.toString());
+};
+
+quizSchema.index({ createdBy: 1, startTime: 1 });
+quizSchema.index({ quizName: "text" });
+quizSchema.index({ quizName: 1, facultyId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Quiz", quizSchema);

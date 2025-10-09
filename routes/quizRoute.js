@@ -8,15 +8,39 @@ const {
   updateQuiz,
   getQuizzesWithUserAttempts,
 } = require("../controllers/quizController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
 
-router.get("/user", protect, getQuizzesWithUserAttempts);
+router.get(
+  "/user",
+  protect,
+  authorizeRoles("student"),
+  getQuizzesWithUserAttempts
+);
 // Routes
-router.get("/", getAllQuizzes);
-router.post("/", createQuiz);
-router.get("/:id", getQuizById);
-router.delete("/:id", deleteQuiz);
-router.put("/:id", updateQuiz);
-
+router.get(
+  "/",
+  protect,
+  authorizeRoles("faculty", "superadmin"),
+  getAllQuizzes
+);
+router.post("/", protect, authorizeRoles("faculty"), createQuiz);
+router.get(
+  "/:id",
+  protect,
+  authorizeRoles("faculty", "superadmin"),
+  getQuizById
+);
+router.delete(
+  "/:id",
+  protect,
+  authorizeRoles("faculty", "superadmin"),
+  deleteQuiz
+);
+router.put(
+  "/:id",
+  protect,
+  authorizeRoles("faculty", "superadmin"),
+  updateQuiz
+);
 
 module.exports = router;

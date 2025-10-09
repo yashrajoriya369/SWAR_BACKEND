@@ -43,6 +43,13 @@ const createQuiz = async (req, res) => {
       durationMinutes,
       status,
       questions,
+      createdBy: req.user._id,
+      facultyId: req.user._id,
+      shuffleQuestions: req.body.shuffleQuestions || false,
+      shuffleOptions: req.body.shuffleOptions || false,
+      visibility: req.body.visibility || "private",
+      tags: req.body.tags || [],
+      notes: req.body.notes || "",
     });
 
     res.status(201).json({ message: "Quiz created successfully", quiz });

@@ -2,156 +2,211 @@ const mongoose = require("mongoose");
 const Attempt = require("../models/quizAttemptModel");
 const Quiz = require("../models/quizSchema");
 const asyncHandler = require("express-async-handler");
+const { gradeAttempt } = require("../utils/grader"); // implement as shown earlier
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+/**
+ * POST /quizzes/:quizId/start
+ */
 const startAttempt = asyncHandler(async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const quizId = req.params.quizId;
+  const userId = req.user?.id;
+  const quizId = req.params.quizId;
 
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-    if (!mongoose.Types.ObjectId.isValid(quizId))
-      return res.status(400).json({ error: "Invalid quizId" });
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!isValidObjectId(quizId)) return res.status(400).json({ error: "Invalid quizId" });
 
-    const quiz = await Quiz.findById(quizId).lean();
-    if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+  const quiz = await Quiz.findById(quizId);
+  if (!quiz) return res.status(404).json({ error: "Quiz not found" });
 
-    const now = new Date();
-    if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime)) {
-      return res.status(400).json({ error: "Quiz is not currently running" });
-    }
-
-    const QuizObjectId = (id) => new mongoose.Types.ObjectId(id);
-    const UserObjectId = (id) => new mongoose.Types.ObjectId(id);
-
-    if (quiz.attemptType === "Single") {
-      const filter = {
-        quizId: QuizObjectId(quizId),
-        userId: UserObjectId(userId),
-      };
-      const update = {
-        $setOnInsert: {
-          quizId: QuizObjectId(quizId),
-          userId: UserObjectId(userId),
-          startedAt: new Date(),
-          score: 0,
-          completed: false,
-          userAgent: req.get("User-Agent") || "",
-          ip: req.ip,
-        },
-      };
-      const opts = {
-        upsert: true,
-        new: true,
-        rawResult: true,
-        setDefaultsOnInsert: true,
-      };
-
-      const resRaw = await Attempt.findOneAndUpdate(filter, update, opts);
-      let attemptDoc = resRaw && resRaw.value ? resRaw.value : null;
-
-      if (!attemptDoc) {
-        attemptDoc = await Attempt.findOne(filter).lean();
-      }
-
-      if (!attemptDoc) {
-        console.debug(
-          "Upsert returned no value and findOne didn't find it; creating fallback attempt.",
-          { filter, resRaw }
-        );
-        const created = await Attempt.create({
-          quizId: QuizObjectId(quizId),
-          userId: UserObjectId(userId),
-          startedAt: new Date(),
-          score: 0,
-          completed: false,
-          userAgent: req.get("User-Agent") || "",
-          ip: req.ip,
-        });
-        attemptDoc = created.toObject ? created.toObject() : created;
-      }
-
-      const wasExisting =
-        resRaw &&
-        resRaw.lastErrorObject &&
-        resRaw.lastErrorObject.updatedExisting;
-
-      if (wasExisting) {
-        return res
-          .status(409)
-          .json({ error: "User already attempted this quiz" });
-      }
-
-      Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(
-        () => {}
-      );
-
-      return res
-        .status(201)
-        .json({ attemptId: attemptDoc._id, startedAt: attemptDoc.startedAt });
-    }
-
-    const attempt = await Attempt.create({
-      quizId,
-      userId,
-      startedAt: new Date(),
-      score: 0,
-      completed: false,
-      userAgent: req.get("User-Agent") || "",
-      ip: req.ip,
-    });
-
-    Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(
-      () => {}
-    );
-
-    return res
-      .status(201)
-      .json({ attemptId: attempt._id, startedAt: attempt.startedAt });
-  } catch (error) {
-    console.error("Failed to start attempt:", error);
-    return res.status(500).json({ error: "Server error" });
+  // is quiz open?
+  const now = new Date();
+  if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime)) {
+    return res.status(403).json({ error: "Quiz is not currently running" });
   }
+
+  // check assignment/visibility
+  if (!quiz.isAssignedTo(userId)) {
+    return res.status(403).json({ error: "You are not assigned this quiz" });
+  }
+
+  // enforce maxAttemptsPerUser (Single or numeric limit)
+  if (quiz.attemptType === "Single" || (quiz.maxAttemptsPerUser && quiz.maxAttemptsPerUser > 0)) {
+    const attemptsCount = await Attempt.countDocuments({ quizId, userId });
+    const limit = quiz.attemptType === "Single" ? 1 : quiz.maxAttemptsPerUser;
+    if (limit && attemptsCount >= limit) {
+      return res.status(409).json({ error: "Attempt limit reached for this quiz" });
+    }
+  }
+
+  // For Single we upsert to avoid duplicates; for Multiple just create one
+  if (quiz.attemptType === "Single") {
+    const filter = { quizId: mongoose.Types.ObjectId(quizId), userId: mongoose.Types.ObjectId(userId) };
+    const update = {
+      $setOnInsert: {
+        quizId: mongoose.Types.ObjectId(quizId),
+        userId: mongoose.Types.ObjectId(userId),
+        startedAt: new Date(),
+        score: 0,
+        completed: false,
+        userAgent: req.get("User-Agent") || "",
+        ip: req.ip,
+        answers: [],
+        autoGraded: true,
+      },
+    };
+    const opts = { upsert: true, new: true, rawResult: true, setDefaultsOnInsert: true };
+
+    const resRaw = await Attempt.findOneAndUpdate(filter, update, opts);
+
+    // If already existed -> conflict (user already started/attempted)
+    const existed = resRaw && resRaw.lastErrorObject && resRaw.lastErrorObject.updatedExisting;
+    if (existed) {
+      return res.status(409).json({ error: "User already attempted this quiz" });
+    }
+
+    // either created or found via fallback — respond with created attempt
+    let attemptDoc = resRaw && resRaw.value ? resRaw.value : null;
+    if (!attemptDoc) {
+      // fallback create
+      const created = await Attempt.create({
+        quizId,
+        userId,
+        startedAt: new Date(),
+        score: 0,
+        completed: false,
+        userAgent: req.get("User-Agent") || "",
+        ip: req.ip,
+        answers: [],
+        autoGraded: true,
+      });
+      attemptDoc = created.toObject ? created.toObject() : created;
+    }
+
+    // increment attemptCount (best-effort; non-blocking)
+    Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(() => {});
+
+    return res.status(201).json({ attemptId: attemptDoc._id, startedAt: attemptDoc.startedAt });
+  }
+
+  // Multiple attempts (unlimited or limited by maxAttemptsPerUser already checked above)
+  const attempt = await Attempt.create({
+    quizId,
+    userId,
+    startedAt: new Date(),
+    score: 0,
+    completed: false,
+    userAgent: req.get("User-Agent") || "",
+    ip: req.ip,
+    answers: [],
+    autoGraded: true,
+  });
+
+  Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(() => {});
+
+  return res.status(201).json({ attemptId: attempt._id, startedAt: attempt.startedAt });
 });
 
+/**
+ * POST /quizzes/:quizId/submit/:attemptId
+ * Body: { answers: [ { questionId, selected, timeSpentMs } ] }
+ */
 const finishAttempt = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  const { quizId, attemptId } = req.params;
+  const { answers } = req.body || {};
+
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!isValidObjectId(attemptId)) return res.status(400).json({ error: "Invalid attemptId" });
+  if (!isValidObjectId(quizId)) return res.status(400).json({ error: "Invalid quizId" });
+
+  if (!Array.isArray(answers)) return res.status(400).json({ error: "answers array is required" });
+
+  // load attempt and quiz
+  const attempt = await Attempt.findById(attemptId);
+  if (!attempt) return res.status(404).json({ error: "Attempt not found" });
+
+  if (String(attempt.userId) !== String(userId)) {
+    return res.status(403).json({ error: "Forbidden: attempt doesn't belong to user" });
+  }
+
+  // prevent double submit (fast path)
+  if (attempt.completed) {
+    return res.status(409).json({ error: "Attempt already submitted" });
+  }
+
+  const quiz = await Quiz.findById(quizId);
+  if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+
+  // ensure attempt belongs to this quiz
+  if (String(attempt.quizId) !== String(quiz._id)) {
+    return res.status(400).json({ error: "Attempt does not belong to given quiz" });
+  }
+
+  // check quiz window (block submission outside)
+  const now = new Date();
+  if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime)) {
+    return res.status(403).json({ error: "Quiz is not currently running" });
+  }
+
+  // grade locally using helper (returns totalScore and graded answers)
+  const { totalScore, answers: gradedAnswers } = gradeAttempt(quiz, answers);
+
+  // Start transaction: save attempt (graded), bump completedCount (if first completion)
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const userId = req.user?.id;
-    const { attemptId } = req.params;
-    const { score = 0, completed = true, answers } = req.body || {};
-
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
-    if (!isValidObjectId(attemptId))
-      return res.status(400).json({ error: "Invalid attemptId" });
-
-    const attempt = await Attempt.findById(attemptId);
-    if (!attempt) return res.status(404).json({ error: "Attempt not found" });
-
-    if (attempt.userId.toString() !== userId) {
-      return res.status(403).json({ error: "Forbidden" });
+    // re-fetch attempt inside session to avoid race
+    const attemptSession = await Attempt.findById(attemptId).session(session);
+    if (!attemptSession) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: "Attempt not found (during transaction)" });
+    }
+    if (attemptSession.completed) {
+      await session.abortTransaction();
+      return res.status(409).json({ error: "Attempt already submitted" });
     }
 
-    const wasCompleted = attempt.completed;
+    // build answers payload to store (matches attempt model's answerSchema)
+    const answersToStore = gradedAnswers.map((ga) => ({
+      questionId: ga.questionId,
+      selected: ga.selected,
+      timeSpentMs: ga.timeSpentMs || 0,
+      isCorrect: !!ga.isCorrect,
+      marksObtained: ga.marksObtained || 0,
+    }));
 
-    attempt.score = typeof score === "number" ? score : attempt.score;
-    attempt.completed = !!completed;
-    attempt.finishedAt = new Date();
-    if (answers) attempt.answers = answers;
+    attemptSession.answers = answersToStore;
+    attemptSession.score = totalScore;
+    attemptSession.completed = true;
+    attemptSession.finishedAt = new Date();
+    attemptSession.autoGraded = true;
+    attemptSession.gradedAt = new Date();
+    attemptSession.gradedBy = null; // auto graded; set teacher id for manual grading
 
-    await attempt.save();
+    await attemptSession.save({ session });
 
-    if (!wasCompleted && attempt.completed) {
-      await Quiz.findByIdAndUpdate(attempt.quizId, {
-        $inc: { completedCount: 1 },
-      }).catch(() => {});
-    }
+    // increment completedCount only if this is the first time it was completed
+    await Quiz.findByIdAndUpdate(
+      quizId,
+      { $inc: { completedCount: 1 } },
+      { session }
+    );
 
-    return res
-      .status(200)
-      .json({ message: "Attempt finished", attemptId: attempt._id });
-  } catch (error) {
-    console.error("Failed to finish attempt:", error);
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "Attempt submitted and graded",
+      attemptId: attemptSession._id,
+      score: attemptSession.score,
+      gradedAt: attemptSession.gradedAt,
+      answers: attemptSession.answers,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error("submitAttempt error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

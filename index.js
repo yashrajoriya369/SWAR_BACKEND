@@ -5,6 +5,7 @@ const PORT = process.env.PORT || 4000;
 const dbConnect = require("./config/dbConnect");
 const app = express();
 const authRouter = require("./routes/authRoute");
+const adminRouter = require("./routes/adminRoute");
 const postRouter = require("./routes/quizRoute");
 const otpRouter = require("./routes/otpRoutes");
 const passRouter = require("./routes/passRoutes");
@@ -52,6 +53,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
+app.use("/api/auth", adminRouter);
 app.use("/api/quizzes", postRouter);
 app.use("/api/auth", otpRouter);
 app.use("/api/auth", passRouter);

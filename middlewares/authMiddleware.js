@@ -3,29 +3,24 @@ const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 
 const protect = asyncHandler(async (req, res, next) => {
+  let token;
+
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+  if (!token) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
   try {
-    let token;
-
-    if (req.cookies && req.cookies.token) {
-      token = req.cookies.token;
-    } else if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
-    }
-    if (!token) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      console.error("JWT error: ", error.message);
-      return res.status(401).json({ error: "Token failed or expired" });
-    }
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
     const user = await User.findById(decoded.id);
     if (!user) return res.status(401).json({ error: "User no longer exists" });
 
@@ -48,4 +43,22 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
-module.exports = { protect };
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+
+    // If user has multiple roles (array) or single role (string)
+    const userRoles = Array.isArray(req.user.roles)
+      ? req.user.roles
+      : [req.user.roles];
+
+    const hasAccess = userRoles.some((role) => allowedRoles.includes(role));
+    if (!hasAccess) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    next();
+  };
+};
+
+module.exports = { protect, authorizeRoles };
