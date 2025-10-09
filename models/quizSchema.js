@@ -5,7 +5,7 @@ const questionSchema = new mongoose.Schema(
     questionText: { type: String, required: true, trim: true },
     questionType: {
       type: String,
-      enum: ["Multiple Choice", "True/False"],
+      enum: ["Multiple Choice", "Checkbox"],
       required: true,
     },
     marks: { type: Number, default: 1, min: 0 },
@@ -13,7 +13,7 @@ const questionSchema = new mongoose.Schema(
       type: [{ type: String, trim: true }],
       validate: {
         validator: function (v) {
-          if (this.questionType === "Multiple Choice") {
+          if (["Multiple Choice", "Checkbox"].includes(this.questionType)) {
             return (
               Array.isArray(v) &&
               v.filter((s) => typeof s === "string" && s.trim() !== "")
@@ -23,30 +23,37 @@ const questionSchema = new mongoose.Schema(
           return true;
         },
         message:
-          "Multiple choice question must have at least 2 non-empty options.",
+          "Questions must have at least 2 non-empty options for Multiple Choice or Checkbox.",
       },
       required: function () {
-        return this.questionType === "Multiple Choice";
+        return ["Multiple Choice", "Checkbox"].includes(this.questionType);
       },
     },
     correctAnswer: {
-      type: String,
+      type: mongoose.Schema.Types.Mixed,
       required: true,
       validate: {
         validator: function (value) {
           if (this.questionType === "Multiple Choice") {
             return (
+              typeof value === "string" &&
               Array.isArray(this.options) &&
-              this.options.includes(String(value))
+              this.options.includes(value)
             );
           }
-          if (this.questionType === "True/False") {
-            const v = String(value).toLowerCase();
-            return ["true", "false"].includes(v) || typeof value === "boolean";
+
+          if (this.questionType === "Checkbox") {
+            return (
+              Array.isArray(value) &&
+              value.length > 0 &&
+              value.every((v) => this.options.includes(v))
+            );
           }
+
           return true;
         },
-        message: "Correct answer must be valid for the question type.",
+        message:
+          "Correct answer(s) must be valid and match available options for this question type.",
       },
     },
   },
@@ -62,12 +69,6 @@ const quizSchema = new mongoose.Schema(
     startTime: { type: Date, required: true, index: true },
     endTime: { type: Date, required: true },
     durationMinutes: { type: Number, required: true, min: 1 },
-    status: {
-      type: String,
-      enum: ["Active", "Draft", "Archived"],
-      default: "Draft",
-      index: true,
-    },
     questions: {
       type: [questionSchema],
       validate: {
