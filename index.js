@@ -53,7 +53,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
-app.use("/api/auth", adminRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/quizzes", postRouter);
 app.use("/api/auth", otpRouter);
 app.use("/api/auth", passRouter);
