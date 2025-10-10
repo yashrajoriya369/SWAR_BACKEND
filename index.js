@@ -23,6 +23,7 @@ const allowedOrigins = [
   "http://192.168.1.10:3000",
   "https://user-gold-omega.vercel.app",
   "https://swar-admin-ko63.vercel.app",
+  "https://super-admin-rho-rosy.vercel.app",
 ];
 
 app.use((req, res, next) => {
@@ -33,11 +34,11 @@ app.use((req, res, next) => {
 
   res.setHeader(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
+    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
   );
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With"
+    "Content-Type, Authorization, X-Requested-With, Cache-Control"
   );
   res.setHeader("Access-Control-Allow-Credentials", "true");
 

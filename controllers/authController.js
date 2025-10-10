@@ -18,6 +18,12 @@ const registerUser = asyncHandler(async (req, res) => {
   if (password !== confirmPassword)
     return res.status(400).json({ error: "Passwords do not match" });
 
+  if (req.body.roles === "superadmin") {
+    return res
+      .status(403)
+      .json({ error: "You cannot create a superadmin account." });
+  }
+
   // Check if user already exists
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -74,6 +80,15 @@ const loginUser = asyncHandler(async (req, res) => {
     return res
       .status(403)
       .json({ error: "Please verify your email using OTP before logging in." });
+  }
+
+  if (user.roles === "faculty" && !user.isApproved) {
+    return res
+      .status(403)
+      .json({
+        error:
+          "Your account is not approved yet. Please wait for admin approval.",
+      });
   }
 
   const token = generateToken(user);

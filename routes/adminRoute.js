@@ -24,7 +24,7 @@ router.patch(
   "/approve-faculty/:id",
   protect,
   authorizeRoles("superadmin"),
-  approveFaculty
+  approvedFaculty
 );
 
 module.exports = router;
