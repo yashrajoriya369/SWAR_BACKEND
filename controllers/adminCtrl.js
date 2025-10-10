@@ -37,4 +37,32 @@ const registerAdminUser = asyncHandler(async (req, res) => {
     .json({ message: `${roles} created successfully`, userId: user._id });
 });
 
-module.exports = { registerAdminUser };
+const listPendingFaculty = asyncHandler(async (req, res) => {
+  const pending = await User.find({
+    roles: "faculty",
+    isApproved: false,
+  }).select("-password");
+
+  res.status(200).json({ pending });
+});
+
+const approvedFaculty = asyncHandler(async (req, res) => {
+  const id = req.params.id;
+  const faculty = await User.findById(id);
+  if (!faculty) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  if (faculty.roles !== "faculty") {
+    return res.status(400).json({ error: "User is not a faculty" });
+  }
+
+  faculty.isApproved = true;
+  faculty.approvedBy = req.user._id;
+  faculty.approvedAt = new Date();
+  faculty.rejectionReason = undefined;
+  await faculty.save();
+
+  res.status(200).json({ message: "Faculty approved", userId: faculty._id });
+});
+
+module.exports = { registerAdminUser, listPendingFaculty, approvedFaculty };

@@ -13,7 +13,7 @@ const registerUser = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: error.details[0].message });
   }
 
-  const { fullName, email, password, confirmPassword } = req.body;
+  const { fullName, email, password, confirmPassword, roles } = req.body;
 
   if (password !== confirmPassword)
     return res.status(400).json({ error: "Passwords do not match" });
@@ -28,13 +28,17 @@ const registerUser = asyncHandler(async (req, res) => {
   const emailOTP = await EmailOTP.findOne({ email });
   if (!emailOTP) return res.status(400).json({ error: "Email not verified" });
 
+  const userRole = roles === "faculty" ? "faculty" : "student";
+
+  const isFaculty = userRole === "faculty";
   // Create user
   const user = await User.create({
     fullName,
     email,
     password,
-    roles: "student",
+    roles: userRole,
     isVerified: true,
+    isApproved: isFaculty ? false : true,
   });
 
   // Delete OTP record
@@ -48,15 +52,19 @@ const registerUser = asyncHandler(async (req, res) => {
     buttonLink: "https://user-gold-omega.vercel.app",
   });
 
-  res
-    .status(201)
-    .json({ message: "Registration successful. You can now log in." });
+  return res.status(201).json({
+    message: isFaculty
+      ? "Signed up - waiting for admin approval."
+      : "Registration successful. You can now log in.",
+  });
 });
 
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ email }).select(
+    "+password +isApproved +roles +isVerified"
+  );
 
   if (!user || !(await user.isPasswordMatched(password))) {
     return res.status(401).json({ error: "Invalid email or password" });
@@ -78,6 +86,7 @@ const loginUser = asyncHandler(async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       roles: user.roles,
+      isApproved: user.isApproved,
     },
   });
 });
