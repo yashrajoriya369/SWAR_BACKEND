@@ -48,8 +48,10 @@ const createQuiz = async (req, res) => {
       shuffleQuestions: req.body.shuffleQuestions || false,
       shuffleOptions: req.body.shuffleOptions || false,
       visibility: req.body.visibility || "private",
-      tags: req.body.tags || [],
       notes: req.body.notes || "",
+      assignedUsers: req.body.assignedUsers || [req.user._id], // ensure assigned
+      attemptCount: 0,
+      completedCount: 0,
     });
 
     res.status(201).json({ message: "Quiz created successfully", quiz });

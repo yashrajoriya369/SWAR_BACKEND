@@ -15,7 +15,8 @@ const startAttempt = asyncHandler(async (req, res) => {
   const quizId = req.params.quizId;
 
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  if (!isValidObjectId(quizId)) return res.status(400).json({ error: "Invalid quizId" });
+  if (!isValidObjectId(quizId))
+    return res.status(400).json({ error: "Invalid quizId" });
 
   const quiz = await Quiz.findById(quizId);
   if (!quiz) return res.status(404).json({ error: "Quiz not found" });
@@ -26,10 +27,11 @@ const startAttempt = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Quiz is not currently running" });
   }
 
-  // check assignment
-  if (!quiz.assignedUsers?.includes(userId)) {
-    return res.status(403).json({ error: "You are not assigned this quiz" });
-  }
+  // // check assignment
+  // const userIdStr = String(userId);
+  // if (!quiz.assignedUsers?.some((u) => String(u) === userIdStr)) {
+  //   return res.status(403).json({ error: "You are not assigned this quiz" });
+  // }
 
   // enforce attempt limit
   const attemptsCount = await Attempt.countDocuments({ quizId, userId });
@@ -37,7 +39,9 @@ const startAttempt = asyncHandler(async (req, res) => {
     return res.status(409).json({ error: "User already attempted this quiz" });
   }
   if (quiz.maxAttemptsPerUser && attemptsCount >= quiz.maxAttemptsPerUser) {
-    return res.status(409).json({ error: "Attempt limit reached for this quiz" });
+    return res
+      .status(409)
+      .json({ error: "Attempt limit reached for this quiz" });
   }
 
   // create attempt
@@ -56,7 +60,9 @@ const startAttempt = asyncHandler(async (req, res) => {
   // increment attemptCount
   Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(() => {});
 
-  return res.status(201).json({ attemptId: attempt._id, startedAt: attempt.startedAt });
+  return res
+    .status(201)
+    .json({ attemptId: attempt._id, startedAt: attempt.startedAt });
 });
 
 /**
@@ -65,31 +71,49 @@ const startAttempt = asyncHandler(async (req, res) => {
  */
 const finishAttempt = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const { quizId, attemptId } = req.params;
-  const { answers } = req.body || {};
+  const { attemptId } = req.params;
+  let { answers } = req.body || {};
 
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  if (!isValidObjectId(quizId) || !isValidObjectId(attemptId)) {
-    return res.status(400).json({ error: "Invalid quizId or attemptId" });
-  }
-  if (!Array.isArray(answers)) return res.status(400).json({ error: "answers array is required" });
+  if (!isValidObjectId(attemptId))
+    return res.status(400).json({ error: "Invalid attemptId" });
+  if (!Array.isArray(answers))
+    return res.status(400).json({ error: "answers array is required" });
 
+  // Normalize answers
+  answers = answers.map((ans, index) => {
+    if (!ans.questionId)
+      throw new Error(`Answer at index ${index} missing questionId`);
+
+    // Convert single-element arrays to string for Multiple Choice
+    if (Array.isArray(ans.selected) && ans.selected.length === 1) {
+      ans.selected = ans.selected[0];
+    }
+
+    if (ans.selected === undefined) ans.selected = null;
+    if (!ans.timeSpentMs) ans.timeSpentMs = 0;
+
+    return ans;
+  });
+
+  // Fetch attempt
   const attempt = await Attempt.findById(attemptId);
   if (!attempt) return res.status(404).json({ error: "Attempt not found" });
-  if (String(attempt.userId) !== String(userId)) {
-    return res.status(403).json({ error: "This attempt does not belong to you" });
-  }
-  if (attempt.completed) return res.status(409).json({ error: "Attempt already submitted" });
+  if (String(attempt.userId) !== String(userId))
+    return res
+      .status(403)
+      .json({ error: "This attempt does not belong to you" });
+  if (attempt.completed)
+    return res.status(409).json({ error: "Attempt already submitted" });
 
-  const quiz = await Quiz.findById(quizId);
+  const quiz = await Quiz.findById(attempt.quizId);
   if (!quiz) return res.status(404).json({ error: "Quiz not found" });
 
   const now = new Date();
-  if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime)) {
+  if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime))
     return res.status(403).json({ error: "Quiz is not currently running" });
-  }
 
-  // grade answers
+  // Grade the attempt
   let gradedResult;
   try {
     gradedResult = gradeAttempt(quiz, answers);
@@ -100,15 +124,23 @@ const finishAttempt = asyncHandler(async (req, res) => {
 
   const { totalScore, answers: gradedAnswers } = gradedResult;
 
-  // save attempt
-  attempt.answers = gradedAnswers.map((ga) => ({
-    questionId: ga.questionId,
-    selected: ga.selected,
-    timeSpentMs: ga.timeSpentMs || 0,
-    isCorrect: !!ga.isCorrect,
-    marksObtained: ga.marksObtained || 0,
-  }));
+  // Save answers and calculate total time spent
+  let totalTimeSpentMs = 0;
+  attempt.answers = gradedAnswers.map((ga) => {
+    const timeSpent = ga.timeSpentMs || 0;
+    totalTimeSpentMs += timeSpent;
+
+    return {
+      questionId: ga.questionId || null,
+      selected: ga.selected !== undefined ? ga.selected : null,
+      timeSpentMs: timeSpent,
+      isCorrect: !!ga.isCorrect,
+      marksObtained: ga.marksObtained || 0,
+    };
+  });
+
   attempt.score = totalScore;
+  attempt.timeSpentMs = totalTimeSpentMs; // store total time
   attempt.completed = true;
   attempt.finishedAt = new Date();
   attempt.gradedAt = new Date();
@@ -117,16 +149,20 @@ const finishAttempt = asyncHandler(async (req, res) => {
 
   await attempt.save();
 
-  // increment completedCount in quiz
-  Quiz.findByIdAndUpdate(quizId, { $inc: { completedCount: 1 } }).catch(() => {});
+  // Increment quiz completed count
+  Quiz.findByIdAndUpdate(quiz._id, { $inc: { completedCount: 1 } }).catch(
+    () => {}
+  );
 
   return res.status(200).json({
     message: "Attempt submitted and graded",
     attemptId: attempt._id,
     score: attempt.score,
+    totalTimeSpentMs: attempt.timeSpentMs,
     gradedAt: attempt.gradedAt,
     answers: attempt.answers,
   });
 });
+
 
 module.exports = { startAttempt, finishAttempt };

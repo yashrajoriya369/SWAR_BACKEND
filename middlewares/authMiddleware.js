@@ -61,19 +61,5 @@ const authorizeRoles = (...allowedRoles) => {
   };
 };
 
-const requireApprovedFaculty = asyncHandler(async (req, res, next) => {
-  if (!req.user) return res.status(401).json({ error: "Not authenticated" });
-  if (req.user.roles !== "faculty")
-    return res
-      .status(403)
-      .json({ error: "Only faculty can perform this action" });
-  // refresh user from DB to ensure up-to-date isApproved (optional)
-  const User = require("../models/userModel");
-  const user = await User.findById(req.user._id).select("isApproved roles");
-  if (!user) return res.status(401).json({ error: "User not found" });
-  if (!user.isApproved)
-    return res.status(403).json({ error: "Account pending approval" });
-  next();
-});
 
-module.exports = { protect, authorizeRoles, requireApprovedFaculty };
+module.exports = { protect, authorizeRoles };

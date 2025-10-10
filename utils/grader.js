@@ -22,7 +22,18 @@ function gradeAttempt(quiz, userAnswers) {
     let marksObtained = 0;
 
     if (question.questionType === "Multiple Choice") {
-      isCorrect = typeof ua.selected === "string" && ua.selected === correct;
+      let selectedValue;
+      if (Array.isArray(ua.selected)) {
+        selectedValue =
+          ua.selected.length === 1 ? question.options[ua.selected[0]] : null;
+      } else {
+        selectedValue =
+          typeof ua.selected === "number"
+            ? question.options[ua.selected]
+            : ua.selected;
+      }
+
+      isCorrect = selectedValue === correct;
       marksObtained = isCorrect ? question.marks || 0 : 0;
     } else if (question.questionType === "Checkbox") {
       if (Array.isArray(ua.selected) && Array.isArray(correct)) {
@@ -30,10 +41,9 @@ function gradeAttempt(quiz, userAnswers) {
         const corr = correct.map((s) => String(s));
         const selSet = new Set(sel);
         const corrSet = new Set(corr);
-        const equal =
+        isCorrect =
           selSet.size === corrSet.size &&
           Array.from(corrSet).every((v) => selSet.has(v));
-        isCorrect = equal;
         marksObtained = isCorrect ? question.marks || 0 : 0;
       } else {
         isCorrect = false;
@@ -45,6 +55,7 @@ function gradeAttempt(quiz, userAnswers) {
     }
 
     totalScore += marksObtained;
+
     return {
       questionId: ua.questionId,
       selected: ua.selected,

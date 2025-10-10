@@ -27,7 +27,7 @@ router.post("/", protect, authorizeRoles("faculty"), createQuiz);
 router.get(
   "/:id",
   protect,
-  authorizeRoles("faculty", "superadmin"),
+  authorizeRoles("student", "faculty", "superadmin"),
   getQuizById
 );
 router.delete(
