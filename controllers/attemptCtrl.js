@@ -7,19 +7,23 @@ const { gradeAttempt } = require("../utils/grader");
 // Helper
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-/**
- * POST /quizzes/:quizId/start
- */
+// POST /quizzes/:quizId/start
 const startAttempt = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
   const quizId = req.params.quizId;
 
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  if (!isValidObjectId(quizId))
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!isValidObjectId(quizId)) {
     return res.status(400).json({ error: "Invalid quizId" });
+  }
 
   const quiz = await Quiz.findById(quizId);
-  if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+  if (!quiz) {
+    return res.status(404).json({ error: "Quiz not found" });
+  }
 
   // check if quiz is running
   const now = new Date();
@@ -27,58 +31,69 @@ const startAttempt = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Quiz is not currently running" });
   }
 
-  // // check assignment
-  // const userIdStr = String(userId);
-  // if (!quiz.assignedUsers?.some((u) => String(u) === userIdStr)) {
-  //   return res.status(403).json({ error: "You are not assigned this quiz" });
-  // }
+  // Check For Existing Attempt
+  let attempt = await Attempt.findOne({
+    quizId,
+    userId,
+    completed: false,
+  });
 
-  // enforce attempt limit
+  // Enforce Attempt Limit
   const attemptsCount = await Attempt.countDocuments({ quizId, userId });
-  if (quiz.attemptType === "Single" && attemptsCount >= 1) {
+  if (quiz.attemptType === "Single" && attemptsCount >= 1 && !attempt) {
     return res.status(409).json({ error: "User already attempted this quiz" });
   }
-  if (quiz.maxAttemptsPerUser && attemptsCount >= quiz.maxAttemptsPerUser) {
+  if (
+    quiz.maxAttemptsPerUser &&
+    attemptsCount >= quiz.maxAttemptsPerUser &&
+    !attempt
+  ) {
     return res
       .status(409)
       .json({ error: "Attempt limit reached for this quiz" });
   }
 
   // create attempt
-  const attempt = await Attempt.create({
-    quizId,
-    userId,
-    startedAt: new Date(),
-    score: 0,
-    completed: false,
-    userAgent: req.get("User-Agent") || "",
-    ip: req.headers["x-forwarded-for"] || req.ip,
-    answers: [],
-    autoGraded: true,
-  });
+  if (!attempt) {
+    attempt = await Attempt.create({
+      quizId,
+      userId,
+      startedAt: new Date(),
+      score: 0,
+      completed: false,
+      userAgent: req.get("User-Agent") || "",
+      ip: req.headers["x-forwarded-for"] || req.ip,
+      answers: [],
+      autoGraded: true,
+    });
 
-  // increment attemptCount
-  Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(() => {});
-
+    // increment attemptCount
+    Quiz.findByIdAndUpdate(quizId, { $inc: { attemptCount: 1 } }).catch(
+      () => {}
+    );
+  }
   return res
-    .status(201)
+    .status(200)
     .json({ attemptId: attempt._id, startedAt: attempt.startedAt });
 });
 
-/**
- * POST /quizzes/:quizId/submit/:attemptId
- * Body: { answers: [ { questionId, selected, timeSpentMs } ] }
- */
+// POST /quizzes/:quizId/submit/:attemptId
 const finishAttempt = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
   const { attemptId } = req.params;
   let { answers } = req.body || {};
 
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  if (!isValidObjectId(attemptId))
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!isValidObjectId(attemptId)) {
     return res.status(400).json({ error: "Invalid attemptId" });
-  if (!Array.isArray(answers))
+  }
+
+  if (!Array.isArray(answers)) {
     return res.status(400).json({ error: "answers array is required" });
+  }
 
   // Normalize answers
   answers = answers.map((ans, index) => {
@@ -98,16 +113,24 @@ const finishAttempt = asyncHandler(async (req, res) => {
 
   // Fetch attempt
   const attempt = await Attempt.findById(attemptId);
-  if (!attempt) return res.status(404).json({ error: "Attempt not found" });
-  if (String(attempt.userId) !== String(userId))
+  if (!attempt) {
+    return res.status(404).json({ error: "Attempt not found" });
+  }
+
+  if (String(attempt.userId) !== String(userId)) {
     return res
       .status(403)
       .json({ error: "This attempt does not belong to you" });
-  if (attempt.completed)
+  }
+
+  if (attempt.completed) {
     return res.status(409).json({ error: "Attempt already submitted" });
+  }
 
   const quiz = await Quiz.findById(attempt.quizId);
-  if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+  if (!quiz) {
+    return res.status(404).json({ error: "Quiz not found" });
+  }
 
   const now = new Date();
   if (now < new Date(quiz.startTime) || now > new Date(quiz.endTime))
@@ -140,7 +163,7 @@ const finishAttempt = asyncHandler(async (req, res) => {
   });
 
   attempt.score = totalScore;
-  attempt.timeSpentMs = totalTimeSpentMs; // store total time
+  attempt.timeSpentMs = totalTimeSpentMs;
   attempt.completed = true;
   attempt.finishedAt = new Date();
   attempt.gradedAt = new Date();
@@ -163,6 +186,5 @@ const finishAttempt = asyncHandler(async (req, res) => {
     answers: attempt.answers,
   });
 });
-
 
 module.exports = { startAttempt, finishAttempt };

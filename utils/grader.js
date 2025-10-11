@@ -58,7 +58,12 @@ function gradeAttempt(quiz, userAnswers) {
 
     return {
       questionId: ua.questionId,
-      selected: ua.selected,
+      selected:
+        ua.selected !== undefined && ua.selected !== null
+          ? ua.selected
+          : question.questionType === "Checkbox"
+          ? [] // empty array for unchecked
+          : null, // null for single choice unanswered
       timeSpentMs: ua.timeSpentMs || 0,
       isCorrect,
       marksObtained,

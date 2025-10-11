@@ -187,37 +187,24 @@ const getQuizzesWithUserAttempts = async (req, res) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    // pagination
-    const page = Math.max(1, parseInt(req.query.page || "1", 10));
-    const limit = Math.max(
-      1,
-      Math.min(100, parseInt(req.query.limit || "20", 10))
-    );
-    const skip = (page - 1) * limit;
-
-    // fetch quiz list (lean for performance)
-    const quizzes = await Quiz.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Fetch All QUizzes
+    const quizzes = await Quiz.find().sort({ createdAt: -1 }).lean();
 
     if (!quizzes || quizzes.length === 0) {
-      return res.status(200).json({ quizzes: [], page, limit });
+      return res.status(200).json({ quizzes: [] });
     }
 
-    // collect quizIds from quizzes (they are already ObjectId or strings)
     const quizIds = quizzes.map((q) => q._id);
 
     // aggregate latest attempt per quiz for this user
     const attemptsAgg = await Attempt.aggregate([
       {
         $match: {
-          userId: new mongoose.Types.ObjectId(userId), // use `new` here
+          userId: new mongoose.Types.ObjectId(userId),
           quizId: { $in: quizIds },
         },
       },
-      { $sort: { createdAt: -1 } }, // newest first
+      { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: "$quizId",
@@ -226,13 +213,12 @@ const getQuizzesWithUserAttempts = async (req, res) => {
       },
     ]);
 
-    // map quizId -> attempt
     const attemptMap = new Map();
     for (const item of attemptsAgg) {
       attemptMap.set(item._id.toString(), item.attempt);
     }
 
-    // attach userAttempt + runtimeStatus
+    // Attach userAttempt + runtimeStatus
     const result = quizzes.map((quiz) => {
       const a = attemptMap.get(quiz._id.toString()) || null;
       const userAttempt = a
@@ -254,7 +240,7 @@ const getQuizzesWithUserAttempts = async (req, res) => {
       };
     });
 
-    return res.status(200).json({ quizzes: result, page, limit });
+    return res.status(200).json({ quizzes: result });
   } catch (error) {
     console.error("Error in getQuizzesWithUserAttempts:", error);
     return res.status(500).json({ error: "Server error" });

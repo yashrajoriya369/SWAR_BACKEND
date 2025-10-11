@@ -66,31 +66,42 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
 
   const user = await User.findOne({ email }).select(
     "+password +isApproved +roles +isVerified"
   );
 
+  // Check Credentials
   if (!user || !(await user.isPasswordMatched(password))) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
+  // Verify Email
   if (!user.isVerified) {
     return res
       .status(403)
       .json({ error: "Please verify your email using OTP before logging in." });
   }
 
+  // Faculty Approval Check
   if (user.roles === "faculty" && !user.isApproved) {
+    return res.status(403).json({
+      error:
+        "Your account is not approved yet. Please wait for admin approval.",
+    });
+  }
+
+  // Role Validation
+  if (role && user.roles !== role) {
     return res
       .status(403)
       .json({
-        error:
-          "Your account is not approved yet. Please wait for admin approval.",
+        error: `Access denied. This account is registered as a ${user.roles}, not a ${role}`,
       });
   }
 
+  // Generate Token 
   const token = generateToken(user);
   setTokenCookie(res, token);
 

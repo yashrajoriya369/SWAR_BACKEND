@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
-const { required } = require("joi");
 
 var userSchema = new mongoose.Schema(
   {
@@ -58,7 +57,6 @@ var userSchema = new mongoose.Schema(
   }
 );
 
-// Hash Pasword
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   if (!this.password) return next();
@@ -69,13 +67,11 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Compare Password
 userSchema.methods.isPasswordMatched = async function (enterdPassword) {
   if (!this.password || !enterdPassword) return false;
   return await bcrypt.compare(enterdPassword, this.password);
 };
 
-// helper to check if password changed after token issued (JWT iat)
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
   if (this.passwordChangedAt) {
     const changedTimestamp = parseInt(
@@ -97,10 +93,8 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-// add lock helpers
 userSchema.methods.incrementFailedLogins = async function () {
   this.failedLoginAttempts = (this.failedLoginAttempts || 0) + 1;
-  // lock after e.g. 5 fails for 15 minutes
   if (this.failedLoginAttempts >= 5) {
     this.lockUntil = Date.now() + 15 * 60 * 1000;
   }
