@@ -10,6 +10,7 @@ const postRouter = require("./routes/quizRoute");
 const otpRouter = require("./routes/otpRoutes");
 const passRouter = require("./routes/passRoutes");
 const attemptRouter = require("./routes/attemptRoute");
+const voiceRouter = require("./routes/voiceRoute");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -59,6 +60,7 @@ app.use("/api/quizzes", postRouter);
 app.use("/api/auth", otpRouter);
 app.use("/api/auth", passRouter);
 app.use("/api/attempt", attemptRouter);
+app.use("/api/voice", voiceRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello from Server Side");

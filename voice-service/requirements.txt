@@ -1,0 +1,5 @@
+flask
+gtts
+openai-whisper
+sentence-transformers
+torch

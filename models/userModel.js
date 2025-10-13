@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const voiceProfileSchema = require("./voiceProfileModel");
+const attachVoiceMethods = require("../voice-service/voice/voiceMethods");
 
 var userSchema = new mongoose.Schema(
   {
@@ -51,11 +53,18 @@ var userSchema = new mongoose.Schema(
     },
     approvedAt: Date,
     rejectionReason: String,
+    voiceProfile: {
+      type: voiceProfileSchema,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,
   }
 );
+
+
+attachVoiceMethods(userSchema);
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
