@@ -172,7 +172,6 @@ const finishAttempt = asyncHandler(async (req, res) => {
 
   await attempt.save();
 
-  // Increment quiz completed count
   Quiz.findByIdAndUpdate(quiz._id, { $inc: { completedCount: 1 } }).catch(
     () => {}
   );
@@ -186,5 +185,6 @@ const finishAttempt = asyncHandler(async (req, res) => {
     answers: attempt.answers,
   });
 });
+
 
 module.exports = { startAttempt, finishAttempt };

@@ -3,6 +3,7 @@ const Quiz = require("../models/quizSchema");
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const { getQuizRuntimeStatus } = require("../utils/quiz");
 const Attempt = require("../models/quizAttemptModel");
+const { finished } = require("nodemailer/lib/xoauth2");
 
 // Create a New Quiz
 const createQuiz = async (req, res) => {
@@ -271,6 +272,58 @@ getQuizzesWithFacultyId = async (req, res) => {
   }
 };
 
+getQuizReport = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { quizId } = req.params;
+
+    if (!userId) {
+      return res.status(500).json({ error: "Unauthorized" });
+    }
+
+    if (!isValidObjectId(quizId)) {
+      return res.status(400).json({ error: "Invalid Quiz Id" });
+    }
+
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ error: "Quiz Not Found" });
+    }
+
+    if (
+      String(quiz.facultyId) !== String(userId) &&
+      req.user.roles !== "superadmin"
+    ) {
+      return res.status(403).json({ error: "Access Denied" });
+    }
+
+    const totalMarks = quiz.questions.reduce(
+      (sum, q) => sum + (q.marks || 1),
+      0
+    );
+
+    const attempts = await Attempt.find({ quizId })
+      .populate("userId")
+      .sort({ score: -1 });
+
+    const report = attempts.map((a) => ({
+      fullName: a.userId?.fullName,
+      email: a.userId?.email,
+      score: a.score,
+      startedAt: a.startedAt,
+      finishedAt: a.finishedAt,
+      totalMarks,
+      percentage: ((a.score / totalMarks) * 100).toFixed(2),
+      attemptId: a._id,
+    }));
+    return res
+      .status(200)
+      .json({ quizId, quizName: quiz.quizName, totalMarks, report });
+  } catch (error) {
+    return res.status(500).json({ error: "Server Error" });
+  }
+};
+
 module.exports = {
   createQuiz,
   getAllQuizzes,
@@ -279,4 +332,5 @@ module.exports = {
   deleteQuiz,
   getQuizzesWithUserAttempts,
   getQuizzesWithFacultyId,
+  getQuizReport,
 };

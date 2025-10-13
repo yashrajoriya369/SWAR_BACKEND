@@ -8,6 +8,7 @@ const {
   updateQuiz,
   getQuizzesWithUserAttempts,
   getQuizzesWithFacultyId,
+  getQuizReport,
 } = require("../controllers/quizController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
 
@@ -24,13 +25,10 @@ router.get(
   authorizeRoles("student"),
   getQuizzesWithUserAttempts
 );
+
+router.get("/:quizId/report", protect, authorizeRoles("faculty"), getQuizReport);
 // Routes
-router.get(
-  "/",
-  protect,
-  authorizeRoles("faculty", "superadmin"),
-  getAllQuizzes
-);
+router.get("/", protect, authorizeRoles("superadmin"), getAllQuizzes);
 router.post("/", protect, authorizeRoles("faculty"), createQuiz);
 router.get(
   "/:id",
