@@ -7,8 +7,16 @@ const {
   deleteQuiz,
   updateQuiz,
   getQuizzesWithUserAttempts,
+  getQuizzesWithFacultyId,
 } = require("../controllers/quizController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
+
+router.get(
+  "/faculty",
+  protect,
+  authorizeRoles("faculty"),
+  getQuizzesWithFacultyId
+);
 
 router.get(
   "/user",

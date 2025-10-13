@@ -247,6 +247,30 @@ const getQuizzesWithUserAttempts = async (req, res) => {
   }
 };
 
+getQuizzesWithFacultyId = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user.roles;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Fetch all Quizzes
+    const quizzes = await Quiz.find({ facultyId: userId })
+      .populate("facultyId", "email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: quizzes.length,
+      quizzes,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Server Error" });
+  }
+};
+
 module.exports = {
   createQuiz,
   getAllQuizzes,
@@ -254,4 +278,5 @@ module.exports = {
   updateQuiz,
   deleteQuiz,
   getQuizzesWithUserAttempts,
+  getQuizzesWithFacultyId,
 };
