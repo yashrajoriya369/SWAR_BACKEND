@@ -63,7 +63,6 @@ var userSchema = new mongoose.Schema(
   }
 );
 
-
 attachVoiceMethods(userSchema);
 
 userSchema.pre("save", async function (next) {
