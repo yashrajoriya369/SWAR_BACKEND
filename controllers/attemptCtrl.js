@@ -206,10 +206,14 @@ const showResult = asyncHandler(async (req, res) => {
       return res.status(404).json({ error: "Result not found" });
     }
 
-    const totalQuestions =
-      result.quizId?.questions.length || result.answers.length;
+    console.log(result);
+    const totalQuestions = result.quizId?.questions.length;
     const correctAnswers = result.answers.filter((a) => a.isCorrect).length;
     const wrongAnswers = totalQuestions - correctAnswers;
+
+    const totalMarks =
+      result.quizId?.questions?.reduce((sum, q) => sum + (q.marks || 0), 0) ||
+      0;
 
     let timeTakenSec = 0;
     if (result.startedAt && result.finishedAt) {
@@ -217,9 +221,7 @@ const showResult = asyncHandler(async (req, res) => {
     }
 
     const percentage =
-      totalQuestions > 0
-        ? ((correctAnswers / totalQuestions) * 100).toFixed(2)
-        : 0;
+      totalQuestions > 0 ? ((result.score / totalMarks) * 100).toFixed(2) : 0;
     return res.status(200).json({
       message: "Quiz result fetcehd successfully",
       data: {
