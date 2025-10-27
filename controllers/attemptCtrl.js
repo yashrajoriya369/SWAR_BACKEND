@@ -186,5 +186,59 @@ const finishAttempt = asyncHandler(async (req, res) => {
   });
 });
 
+const showResult = asyncHandler(async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.user?.id;
 
-module.exports = { startAttempt, finishAttempt };
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (!quizId) {
+      return res.status(401).json({ error: "Invalid quiz Id" });
+    }
+
+    const result = await Attempt.findOne({ quizId, userId })
+      .populate("userId", "name email")
+      .populate("quizId", "quizName, durationMinutes questions");
+
+    if (!result) {
+      return res.status(404).json({ error: "Result not found" });
+    }
+
+    const totalQuestions =
+      result.quizId?.questions.length || result.answers.length;
+    const correctAnswers = result.answers.filter((a) => a.isCorrect).length;
+    const wrongAnswers = totalQuestions - correctAnswers;
+
+    let timeTakenSec = 0;
+    if (result.startedAt && result.finishedAt) {
+      timeTakenSec = Math.round((result.finishedAt - result.startedAt) / 1000);
+    }
+
+    const percentage =
+      totalQuestions > 0
+        ? ((correctAnswers / totalQuestions) * 100).toFixed(2)
+        : 0;
+    return res.status(200).json({
+      message: "Quiz result fetcehd successfully",
+      data: {
+        quizName: result.quizId?.quizName,
+        totalQuestions,
+        correctAnswers,
+        wrongAnswers,
+        score: result.score,
+        percentage,
+        timeTaken: `${timeTakenSec} sec`,
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        attemptId: result._id,
+        user: result.userId,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Server Error" });
+  }
+});
+
+module.exports = { startAttempt, finishAttempt, showResult };
