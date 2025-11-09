@@ -21,7 +21,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://192.168.1.10:3000",
-  "https://user-gold-omega.vercel.app",
+  "https://user-ten-kohl.vercel.app",
   "https://swar-admin-ko63.vercel.app",
   "https://super-admin-rho-rosy.vercel.app",
 ];
