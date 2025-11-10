@@ -13,7 +13,7 @@ const forgotPasswordToken = asyncHandler(async (req, res) => {
   const token = await user.createPasswordResetToken();
   await user.save();
 
-  const resetLink = `https://user-omega-three.vercel.app/reset-password/${token}`;
+  const resetLink = `https://user-ten-kohl.vercel.app/reset-password/${token}`;
   await sendEmail(user.email, "Reset Your Password", "reset", {
     resetLink,
     userName: user.fullName,

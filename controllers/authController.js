@@ -50,12 +50,12 @@ const registerUser = asyncHandler(async (req, res) => {
   // Delete OTP record
   await EmailOTP.deleteOne({ email });
 
-  await sendEmail(user.email, "Welcome to PrepMaster 🎉", "notification", {
+  await sendEmail(user.email, "Welcome to SYNRX", "notification", {
     title: `Welcome, ${user.fullName}!`,
     message:
       "Your account has been successfully created. Start exploring your dashboard now.",
     buttonText: "Go to Dashboard",
-    buttonLink: "https://user-gold-omega.vercel.app",
+    buttonLink: "https://user-ten-kohl.vercel.app",
   });
 
   return res.status(201).json({
