@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const sendEmail = require("./emailController");
 const { registerSchema } = require("../utils/validationSchema");
 const EmailOTP = require("../models/emailModel");
+const jwt = require("jsonwebtoken");
 
 const registerUser = asyncHandler(async (req, res) => {
   const { error } = registerSchema.validate(req.body);
@@ -94,14 +95,12 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // Role Validation
   if (role && user.roles !== role) {
-    return res
-      .status(403)
-      .json({
-        error: `Access denied. This account is registered as a ${user.roles}, not a ${role}`,
-      });
+    return res.status(403).json({
+      error: `Access denied. This account is registered as a ${user.roles}, not a ${role}`,
+    });
   }
 
-  // Generate Token 
+  // Generate Token
   const token = generateToken(user);
   setTokenCookie(res, token);
 
@@ -122,8 +121,21 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 });
 
+const check = asyncHandler(async (req, res) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ loggedIn: false });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    res.json({ loggedIn: true, user: decoded });
+  } catch (error) {
+    res.status(401).json({ loggedIn: false });
+  }
+});
+
 module.exports = {
   registerUser,
   loginUser,
   logoutUser,
+  check,
 };
