@@ -127,7 +127,8 @@ const check = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    res.json({ loggedIn: true, user: decoded });
+    const user = await User.findById(decoded.id).select("-voiceProfile");
+    res.json({ loggedIn: true, user });
   } catch (error) {
     res.status(401).json({ loggedIn: false });
   }
