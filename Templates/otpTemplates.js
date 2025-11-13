@@ -95,7 +95,7 @@ const otpTemplate = (otp) => {
     <div class="divider"></div>
 
     <div class="footer">
-      &copy; ${new Date().getFullYear()} PrepMaster. All rights reserved.
+      &copy; ${new Date().getFullYear()} SYNRX. All rights reserved.
     </div>
   </div>
 </body>
