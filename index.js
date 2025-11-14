@@ -21,9 +21,11 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "http://192.168.1.10:3000",
+  "http://localhost:5173",
   "https://user-ten-kohl.vercel.app",
   "https://swar-admin-ko63.vercel.app",
   "https://super-admin-rho-rosy.vercel.app",
+  "https://superproject-chi.vercel.app",
 ];
 
 app.use((req, res, next) => {
