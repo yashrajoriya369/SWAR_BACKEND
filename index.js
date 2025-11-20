@@ -26,8 +26,6 @@ const allowedOrigins = [
   "https://swar-admin-ko63.vercel.app",
   "https://super-admin-rho-rosy.vercel.app",
   "https://superproject-chi.vercel.app",
-  "https://superproject-chi.vercel.app/admin/login",
-  "https://superproject-chi.vercel.app/superadmin/login",
 ];
 
 app.use((req, res, next) => {
