@@ -43,7 +43,12 @@ var userSchema = new mongoose.Schema(
     },
     isApproved: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,

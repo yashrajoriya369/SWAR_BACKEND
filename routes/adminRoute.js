@@ -3,6 +3,7 @@ const {
   registerAdminUser,
   listPendingFaculty,
   approvedFaculty,
+  rejectFaculty,
 } = require("../controllers/adminCtrl");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
 const router = express.Router();
@@ -25,6 +26,13 @@ router.patch(
   protect,
   authorizeRoles("superadmin"),
   approvedFaculty
+);
+
+router.patch(
+  "/reject-faculty/:id",
+  protect,
+  authorizeRoles("superadmin"),
+  rejectFaculty
 );
 
 module.exports = router;

@@ -50,13 +50,14 @@ const approvedFaculty = asyncHandler(async (req, res) => {
   const id = req.params.id;
   const faculty = await User.findById(id);
   if (!faculty) {
-    return res.status(404).json({ error: "User not found" });
+    return res.status(404).json({ error: "Faculty not found" });
   }
   if (faculty.roles !== "faculty") {
     return res.status(400).json({ error: "User is not a faculty" });
   }
 
   faculty.isApproved = true;
+  faculty.approvalStatus = "approved";
   faculty.approvedBy = req.user._id;
   faculty.approvedAt = new Date();
   faculty.rejectionReason = undefined;
@@ -65,4 +66,39 @@ const approvedFaculty = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Faculty approved", userId: faculty._id });
 });
 
-module.exports = { registerAdminUser, listPendingFaculty, approvedFaculty };
+const rejectFaculty = asyncHandler(async (req, res) => {
+  const id = req.params.id;
+  const { reason } = req.body;
+
+  const faculty = await User.findById(id);
+
+  if (!faculty) {
+    return res.status(404).json({ error: "Faculty not found" });
+  }
+
+  if (faculty.roles !== "faculty") {
+    return res.status(400).json({ error: "User is not a faculty" });
+  }
+
+  faculty.isApproved = false;
+  faculty.approvalStatus = "rejected"; // IMPORTANT
+  faculty.rejectionReason = reason || "No reason provided";
+  faculty.approvedBy = req.user._id;
+  faculty.approvedAt = new Date();
+
+  await faculty.save();
+
+  res.status(200).json({
+    message: "Faculty request rejected",
+    userId: faculty._id,
+    status: faculty.approvalStatus,
+    reason: faculty.rejectionReason,
+  });
+});
+
+module.exports = {
+  registerAdminUser,
+  listPendingFaculty,
+  approvedFaculty,
+  rejectFaculty,
+};
