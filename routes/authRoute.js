@@ -8,6 +8,8 @@ const {
   sendFacultyInvite,
   completeFacultyRegistration,
   completeStudentProfile,
+  updateStudentProfile,
+  updateFullUserProfile,
 } = require("../controllers/authController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
 const router = express.Router();
@@ -19,6 +21,14 @@ router.post(
   authorizeRoles("student"),
   completeStudentProfile
 );
+router.put(
+  "/update-profile",
+  protect,
+  authorizeRoles("student"),
+  updateStudentProfile
+);
+router.put("/profile", protect, updateFullUserProfile);
+
 router.post("/login", loginUser);
 router.post("/logout", protect, logoutUser);
 router.get("/check", checkCurrentUser);

@@ -118,20 +118,17 @@ const checkCurrentUser = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id)
+      .select(
+        "-password -approvalStatus -failedLoginAttempts -createdAt -deletedAt -isActive -isVerified -passwordChangedAt"
+      )
+      .populate("studentProfile");
 
     if (!user) return res.status(401).json({ loggedIn: false });
-
     res.json({
       loggedIn: true,
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        roles: user.roles,
-        isApproved: user.isApproved,
-        profileCompleted: !user.studentProfile,
-      },
+      user,
+      profileCompleted: !user.studentProfile,
     });
   } catch (error) {
     res.clearCookie("token", {
@@ -155,22 +152,138 @@ const fetchAllUsers = asyncHandler(async (req, res) => {
 });
 
 // Complete Student Profile
+// const completeStudentProfile = asyncHandler(async (req, res) => {
+//   const userId = req.user.id;
+//   const { enrollmentNumber, section, year, department, program } = req.body;
+
+//   let student = await Course.findOne({ user: userId });
+
+//   if (student) {
+//     student.enrollmentNumber = enrollmentNumber;
+//     student.section = section;
+//     student.year = year;
+//     student.department = department;
+//     student.program = program;
+
+//     await student.save();
+//   } else {
+//     student = await Course.create({
+//       user: userId,
+//       enrollmentNumber,
+//       section,
+//       year,
+//       department,
+//       program,
+//     });
+//   }
+
+//   await User.findByIdAndUpdate(userId, { studentProfile: student._id });
+
+//   res.status(201).json({ message: "Profile completed successfully" }, student);
+// });
 const completeStudentProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { enrollmentNumber, section, year, department, program } = req.body;
 
-  let student = await Course.findOne({ user: userId });
+  const existingProfile = await Course.findOne({ user: userId });
 
-  if (student) {
-    student.enrollmentNumber = enrollmentNumber;
-    student.section = section;
-    student.year = year;
-    student.department = department;
-    student.program = program;
+  if (existingProfile) {
+    return res.status(400).json({
+      error: "Profile already exists. Use update endpoint instead.",
+    });
+  }
 
-    await student.save();
-  } else {
-    student = await Course.create({
+  const student = await Course.create({
+    user: userId,
+    enrollmentNumber,
+    section,
+    year,
+    department,
+    program,
+  });
+
+  await User.findByIdAndUpdate(userId, { studentProfile: student._id });
+
+  res.status(201).json({
+    message: "Profile created successfully",
+    student,
+  });
+});
+
+// Update Student Profile
+const updateStudentProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const student = await Course.findOne({ user: userId });
+
+  if (!student) {
+    return res.status(404).json({
+      error: "No profile found. Complete your profile first.",
+    });
+  }
+
+  const allowedFields = [
+    "enrollmentNumber",
+    "section",
+    "year",
+    "department",
+    "program",
+  ];
+
+  allowedFields.forEach((field) => {
+    if (req.body[field]) {
+      student[field] = req.body[field];
+    }
+  });
+
+  await student.save();
+  await User.findByIdAndUpdate(userId, { studentProfile: student._id });
+
+  res.status(200).json({
+    message: "Profile updated successfully",
+    student,
+  });
+});
+
+// Update full Profile
+const updateFullUserProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const {
+    fullName,
+    email,
+    phone,
+    address,
+    enrollmentNumber,
+    section,
+    year,
+    department,
+    program,
+  } = req.body;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    {
+      fullName: fullName || undefined,
+      email: email || undefined,
+      phone: phone || undefined,
+      address: address || undefined,
+    },
+    { new: true }
+  ).populate("studentProfile");
+
+  let studentProfile = await Course.findOne({ user: userId });
+
+  if (studentProfile) {
+    studentProfile.enrollmentNumber =
+      enrollmentNumber || studentProfile.enrollmentNumber;
+    studentProfile.section = section || studentProfile.section;
+    studentProfile.year = year || studentProfile.year;
+    studentProfile.department = department || studentProfile.department;
+    studentProfile.program = program || studentProfile.program;
+
+    await studentProfile.save();
+  } else if (enrollmentNumber || section || year || department || program) {
+    studentProfile = await Course.create({
       user: userId,
       enrollmentNumber,
       section,
@@ -178,11 +291,19 @@ const completeStudentProfile = asyncHandler(async (req, res) => {
       department,
       program,
     });
+
+    updatedUser.studentProfile = studentProfile._id;
+    await updatedUser.save();
   }
 
-  await User.findByIdAndUpdate(userId, { studentProfile: student._id });
+  const userWithProfile = await User.findById(userId).populate(
+    "studentProfile"
+  );
 
-  res.status(201).json({ message: "Profile completed successfully" }, student);
+  res.status(200).json({
+    message: "Profile updated successfully",
+    user: userWithProfile,
+  });
 });
 
 // Send Invite
@@ -315,4 +436,6 @@ module.exports = {
   registerFaculty,
   completeFacultyRegistration,
   completeStudentProfile,
+  updateStudentProfile,
+  updateFullUserProfile,
 };
