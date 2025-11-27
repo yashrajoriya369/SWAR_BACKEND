@@ -323,7 +323,7 @@ const sendFacultyInvite = asyncHandler(async (req, res) => {
     expiresAt,
   });
 
-  const registrationLink = `http://localhost:5173/faculty/register/${inviteToken}`;
+  const registrationLink = `https://superproject-chi.vercel.app/faculty/register/${inviteToken}`;
 
   await sendEmail(email, "Faculty Registration Invitation", "notification", {
     title: "Faculty Invitation",
