@@ -7,19 +7,26 @@ const {
   fetchAllUsers,
   sendFacultyInvite,
   completeFacultyRegistration,
+  completeStudentProfile,
 } = require("../controllers/authController");
 const { protect, authorizeRoles } = require("../middlewares/authMiddleware");
 const router = express.Router();
 
 router.post("/signup", registerUser);
+router.post(
+  "/add-course",
+  protect,
+  authorizeRoles("student"),
+  completeStudentProfile
+);
 router.post("/login", loginUser);
 router.post("/logout", protect, logoutUser);
 router.get("/check", checkCurrentUser);
 router.get("/fetchusers", protect, authorizeRoles("faculty"), fetchAllUsers);
 router.post(
   "/invite-faculty",
-  // protect,
-  // authorizeRoles("superadmin"),
+  protect,
+  authorizeRoles("superadmin"),
   sendFacultyInvite
 );
 router.post("/complete-faculty-registration", completeFacultyRegistration);

@@ -1,19 +1,19 @@
 const User = require("../models/userModel");
+const EmailOTP = require("../models/emailModel");
+const Course = require("../models/courseModel");
+const FacultyInvite = require("../models/facultyInviteModel");
+const sendEmail = require("./emailController");
 const asyncHandler = require("express-async-handler");
 const { generateToken } = require("../config/jwtoken");
 const { setTokenCookie, clearTokenCookie } = require("../utils/cookies");
 const crypto = require("crypto");
-const sendEmail = require("./emailController");
 const { registerSchema } = require("../utils/validationSchema");
-const EmailOTP = require("../models/emailModel");
 const jwt = require("jsonwebtoken");
-const FacultyInvite = require("../models/facultyInviteModel");
 
+// Register User
 const registerUser = asyncHandler(async (req, res) => {
   const { error } = registerSchema.validate(req.body);
-  if (error) {
-    return res.status(400).json({ error: error.details[0].message });
-  }
+  if (error) return res.status(400).json({ error: error.details[0].message });
 
   const { fullName, email, password, confirmPassword, roles } = req.body;
 
@@ -26,20 +26,16 @@ const registerUser = asyncHandler(async (req, res) => {
       .json({ error: "You cannot create a superadmin account." });
   }
 
-  // Check if user already exists
   const userExists = await User.findOne({ email });
-  if (userExists) {
+  if (userExists)
     return res.status(400).json({ error: "Email already registered" });
-  }
 
-  // Ensure OTP is verified
   const emailOTP = await EmailOTP.findOne({ email });
   if (!emailOTP) return res.status(400).json({ error: "Email not verified" });
 
   const userRole = roles === "faculty" ? "faculty" : "student";
-
   const isFaculty = userRole === "faculty";
-  // Create user
+
   const user = await User.create({
     fullName,
     email,
@@ -49,7 +45,6 @@ const registerUser = asyncHandler(async (req, res) => {
     isApproved: isFaculty ? false : true,
   });
 
-  // Delete OTP record
   await EmailOTP.deleteOne({ email });
 
   await sendEmail(user.email, "Welcome to SYNRX", "notification", {
@@ -57,51 +52,43 @@ const registerUser = asyncHandler(async (req, res) => {
     message:
       "Your account has been successfully created. Start exploring your dashboard now.",
     buttonText: "Go to Dashboard",
-    buttonLink: "https://user-ten-kohl.vercel.app",
+    buttonLink: "https://superproject-chi.vercel.app",
   });
 
   return res.status(201).json({
     message: isFaculty
       ? "Signed up - waiting for admin approval."
       : "Registration successful. You can now log in.",
+    userId: user._id,
+    profileCompleted: false,
   });
 });
 
+// Login User
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
 
   const user = await User.findOne({ email }).select(
-    "+password +isApproved +roles +isVerified"
+    "+password +isApproved +roles +isVerified +studentProfile"
   );
 
-  // Check Credentials
-  if (!user || !(await user.isPasswordMatched(password))) {
+  if (!user || !(await user.isPasswordMatched(password)))
     return res.status(401).json({ error: "Invalid email or password" });
-  }
 
-  // Verify Email
-  if (!user.isVerified) {
+  if (!user.isVerified)
     return res
       .status(403)
       .json({ error: "Please verify your email using OTP before logging in." });
-  }
 
-   // Faculty Approval Check
-  if (user.roles === "faculty" && !user.isApproved) {
+  if (user.roles === "faculty" && !user.isApproved)
     return res.status(403).json({
       error:
         "Your account is not approved yet. Please wait for admin approval.",
     });
-  }
 
-  // // Role Validation
-  if (role && user.roles !== role) {
-    return res.status(403).json({
-      error: `Access denied. This account is registered as a ${user.roles}, not a ${role}`,
-    });
-  }
+  if (role && user.roles !== role)
+    return res.status(403).json({ error: `Access denied for role ${role}` });
 
-  // // Generate Token
   const token = generateToken(user);
   setTokenCookie(res, token);
 
@@ -113,24 +100,25 @@ const loginUser = asyncHandler(async (req, res) => {
       email: user.email,
       roles: user.roles,
       isApproved: user.isApproved,
+      profileCompleted: !!user.studentProfile,
     },
   });
 });
 
+// Logout User
 const logoutUser = asyncHandler(async (req, res) => {
   clearTokenCookie(res);
   res.status(200).json({ message: "Logged out successfully" });
 });
 
+// Check Current User
 const checkCurrentUser = asyncHandler(async (req, res) => {
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ loggedIn: false });
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select(
-      "-password -voiceProfile"
-    );
+    const user = await User.findById(decoded.id).select("-password");
 
     if (!user) return res.status(401).json({ loggedIn: false });
 
@@ -142,6 +130,7 @@ const checkCurrentUser = asyncHandler(async (req, res) => {
         email: user.email,
         roles: user.roles,
         isApproved: user.isApproved,
+        profileCompleted: !user.studentProfile,
       },
     });
   } catch (error) {
@@ -153,21 +142,50 @@ const checkCurrentUser = asyncHandler(async (req, res) => {
   }
 });
 
+// Fetch all Students
 const fetchAllUsers = asyncHandler(async (req, res) => {
-  try {
-    const users = await User.find({ roles: "student" }).select(
-      "-passwordChangedAt -failedLoginAttempts -isApproved -createdAt -updatedAt"
-    );
-    res.status(200).json({
-      success: true,
-      total: users.length,
-      users,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  const users = await User.find({ roles: "student" }).select(
+    "-passwordChangedAt -failedLoginAttempts -isApproved -createdAt -updatedAt"
+  );
+  res.status(200).json({
+    success: true,
+    total: users.length,
+    users,
+  });
 });
 
+// Complete Student Profile
+const completeStudentProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { enrollmentNumber, section, year, department, program } = req.body;
+
+  let student = await Course.findOne({ user: userId });
+
+  if (student) {
+    student.enrollmentNumber = enrollmentNumber;
+    student.section = section;
+    student.year = year;
+    student.department = department;
+    student.program = program;
+
+    await student.save();
+  } else {
+    student = await Course.create({
+      user: userId,
+      enrollmentNumber,
+      section,
+      year,
+      department,
+      program,
+    });
+  }
+
+  await User.findByIdAndUpdate(userId, { studentProfile: student._id });
+
+  res.status(201).json({ message: "Profile completed successfully" }, student);
+});
+
+// Send Invite
 const sendFacultyInvite = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -197,6 +215,7 @@ const sendFacultyInvite = asyncHandler(async (req, res) => {
   return res.status(200).json({ message: "Invitation sent successfully" });
 });
 
+// Register Faculty
 const registerFaculty = asyncHandler(async (req, res) => {
   const { fullName, email, password, confirmPassword } = req.body;
 
@@ -244,13 +263,13 @@ const registerFaculty = asyncHandler(async (req, res) => {
   });
 });
 
+// Approve Invite
 const completeFacultyRegistration = asyncHandler(async (req, res) => {
   const { inviteToken, fullName, password, confirmPassword } = req.body;
 
   if (!inviteToken)
     return res.status(400).json({ error: "Invalid or missing token" });
 
-  // Check invite
   const invite = await FacultyInvite.findOne({ inviteToken });
 
   if (!invite) return res.status(400).json({ error: "Invalid invite token" });
@@ -295,4 +314,5 @@ module.exports = {
   sendFacultyInvite,
   registerFaculty,
   completeFacultyRegistration,
+  completeStudentProfile,
 };
