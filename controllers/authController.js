@@ -68,9 +68,9 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
 
-  const user = await User.findOne({ email }).select(
-    "+password +isApproved +roles +isVerified +studentProfile"
-  );
+  const user = await User.findOne({ email })
+    .select("+password +isApproved +roles +isVerified +studentProfile")
+    .populate("studentProfile");
 
   if (!user || !(await user.isPasswordMatched(password)))
     return res.status(401).json({ error: "Invalid email or password" });
@@ -101,9 +101,11 @@ const loginUser = asyncHandler(async (req, res) => {
       roles: user.roles,
       isApproved: user.isApproved,
       profileCompleted: !!user.studentProfile,
+      studentProfile: user.studentProfile,
     },
   });
 });
+
 
 // Logout User
 const logoutUser = asyncHandler(async (req, res) => {
@@ -118,17 +120,19 @@ const checkCurrentUser = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.id)
       .select(
-        "-password -approvalStatus -failedLoginAttempts -createdAt -deletedAt -isActive -isVerified -passwordChangedAt"
+        "-approvalStatus -createdAt -deletedAt -failedLoginAttempts -isActive -isVerified -passwordChangedAt"
       )
       .populate("studentProfile");
 
     if (!user) return res.status(401).json({ loggedIn: false });
+
     res.json({
       loggedIn: true,
       user,
-      profileCompleted: !user.studentProfile,
+      profileCompleted: !!user.studentProfile,
     });
   } catch (error) {
     res.clearCookie("token", {
@@ -152,35 +156,6 @@ const fetchAllUsers = asyncHandler(async (req, res) => {
 });
 
 // Complete Student Profile
-// const completeStudentProfile = asyncHandler(async (req, res) => {
-//   const userId = req.user.id;
-//   const { enrollmentNumber, section, year, department, program } = req.body;
-
-//   let student = await Course.findOne({ user: userId });
-
-//   if (student) {
-//     student.enrollmentNumber = enrollmentNumber;
-//     student.section = section;
-//     student.year = year;
-//     student.department = department;
-//     student.program = program;
-
-//     await student.save();
-//   } else {
-//     student = await Course.create({
-//       user: userId,
-//       enrollmentNumber,
-//       section,
-//       year,
-//       department,
-//       program,
-//     });
-//   }
-
-//   await User.findByIdAndUpdate(userId, { studentProfile: student._id });
-
-//   res.status(201).json({ message: "Profile completed successfully" }, student);
-// });
 const completeStudentProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { enrollmentNumber, section, year, department, program } = req.body;
@@ -210,7 +185,7 @@ const completeStudentProfile = asyncHandler(async (req, res) => {
   });
 });
 
-// Update Student Profile
+// update Student Profile
 const updateStudentProfile = asyncHandler(async (req, res) => {
   const userId = req.user.id;
 
